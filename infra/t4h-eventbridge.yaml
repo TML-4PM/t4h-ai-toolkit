@@ -1,0 +1,207 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: T4H Autonomous OS - EventBridge schedules for 10 triggers
+
+Parameters:
+  AccountId:
+    Type: String
+    Default: "140548542136"
+  Region:
+    Type: String
+    Default: ap-southeast-2
+
+Resources:
+  # Daily Harvest - 6am AEST (8pm UTC)
+  DailyHarvestRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: t4h-daily-harvest
+      Description: Daily data harvest - all businesses
+      ScheduleExpression: "cron(0 20 * * ? *)"
+      State: ENABLED
+      Targets:
+        - Id: autonomy-controller-harvest
+          Arn: !Sub "arn:aws:lambda:${Region}:${AccountId}:function:autonomy-controller"
+          Input: '{"action":"daily_harvest"}'
+  DailyHarvestPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: autonomy-controller
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt DailyHarvestRule.Arn
+
+  # Hourly Govern
+  HourlyGovernRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: t4h-hourly-govern
+      Description: Hourly governance loop
+      ScheduleExpression: "rate(1 hour)"
+      State: ENABLED
+      Targets:
+        - Id: autonomy-controller-govern
+          Arn: !Sub "arn:aws:lambda:${Region}:${AccountId}:function:autonomy-controller"
+          Input: '{"action":"hourly_govern"}'
+  HourlyGovernPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: autonomy-controller
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt HourlyGovernRule.Arn
+
+  # Data Ops Worker - 6:30am AEST
+  DataOpsRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: t4h-dataops-daily
+      ScheduleExpression: "cron(30 20 * * ? *)"
+      State: ENABLED
+      Targets:
+        - Id: dataops-target
+          Arn: !Sub "arn:aws:lambda:${Region}:${AccountId}:function:autonomy-worker-dataops"
+          Input: '{"action":"run"}'
+  DataOpsPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: autonomy-worker-dataops
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt DataOpsRule.Arn
+
+  # Finance Ops Worker - 7am AEST
+  FinanceOpsRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: t4h-financeops-daily
+      ScheduleExpression: "cron(0 21 * * ? *)"
+      State: ENABLED
+      Targets:
+        - Id: financeops-target
+          Arn: !Sub "arn:aws:lambda:${Region}:${AccountId}:function:autonomy-worker-financeops"
+          Input: '{"action":"run"}'
+  FinanceOpsPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: autonomy-worker-financeops
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt FinanceOpsRule.Arn
+
+  # Task Ops Worker - 7:30am AEST
+  TaskOpsRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: t4h-taskops-daily
+      ScheduleExpression: "cron(30 21 * * ? *)"
+      State: ENABLED
+      Targets:
+        - Id: taskops-target
+          Arn: !Sub "arn:aws:lambda:${Region}:${AccountId}:function:autonomy-worker-taskops"
+          Input: '{"action":"run"}'
+  TaskOpsPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: autonomy-worker-taskops
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt TaskOpsRule.Arn
+
+  # Website Ops Worker - 8am AEST
+  WebsiteOpsRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: t4h-websiteops-daily
+      ScheduleExpression: "cron(0 22 * * ? *)"
+      State: ENABLED
+      Targets:
+        - Id: websiteops-target
+          Arn: !Sub "arn:aws:lambda:${Region}:${AccountId}:function:autonomy-worker-websiteops"
+          Input: '{"action":"run"}'
+  WebsiteOpsPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: autonomy-worker-websiteops
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt WebsiteOpsRule.Arn
+
+  # TrojanOz Governor - every 2 hours
+  TrojanOzGovernorRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: trojanoz-governor-hourly
+      ScheduleExpression: "rate(2 hours)"
+      State: ENABLED
+      Targets:
+        - Id: trojanoz-governor-target
+          Arn: !Sub "arn:aws:lambda:${Region}:${AccountId}:function:trojanoz-governor"
+          Input: '{"action":"govern"}'
+  TrojanOzGovernorPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: trojanoz-governor
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt TrojanOzGovernorRule.Arn
+
+  # TrojanOz Scorer - daily 9am AEST
+  TrojanOzScorerRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: trojanoz-scorer-daily
+      ScheduleExpression: "cron(0 23 * * ? *)"
+      State: ENABLED
+      Targets:
+        - Id: trojanoz-scorer-target
+          Arn: !Sub "arn:aws:lambda:${Region}:${AccountId}:function:trojanoz-scoring-agent"
+          Input: '{"action":"score_all"}'
+  TrojanOzScorerPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: trojanoz-scoring-agent
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt TrojanOzScorerRule.Arn
+
+  # Signal Ingest - every 30 minutes
+  SignalIngestRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: t4h-signal-ingest
+      ScheduleExpression: "rate(30 minutes)"
+      State: ENABLED
+      Targets:
+        - Id: signal-ingest-target
+          Arn: !Sub "arn:aws:lambda:${Region}:${AccountId}:function:t4h-ingest-signal"
+          Input: '{"action":"ingest"}'
+  SignalIngestPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: t4h-ingest-signal
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt SignalIngestRule.Arn
+
+  # HoloOrg Harvest - 5am AEST (7pm UTC)
+  HoloOrgHarvestRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: holoorg-harvest-daily
+      ScheduleExpression: "cron(0 19 * * ? *)"
+      State: ENABLED
+      Targets:
+        - Id: holoorg-harvest-target
+          Arn: !Sub "arn:aws:lambda:${Region}:${AccountId}:function:holoorg-signal-harvester"
+          Input: '{"action":"harvest"}'
+  HoloOrgHarvestPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: holoorg-signal-harvester
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt HoloOrgHarvestRule.Arn
+
+Outputs:
+  RulesCreated:
+    Value: "10 EventBridge rules deployed"
